@@ -111,6 +111,7 @@ def add_args(parser):
     )
 
     parser.add_argument("--print-checkpoint-structure", action="store_true")
+    parser.add_argument("--model_name", "-mn", choices=['8x7B', '8x22B'], default="8x7B", help=("model name, 8x7B or 8x22B"))
 
     return parser
 
@@ -240,7 +241,7 @@ def get_megatron_sharded_states(args, tp_size, pp_size, ep_size, pp_rank):
             ep_length = len([i for i in state_dict['model'] if 'linear_fc2.weight' in i and 'decoder.layers.0' in i])
             # combine experts within a tensor_parallel
             for key, value in list(state_dict['model'].items()):
-                if 'linear_fc' in key:
+                if 'linear_fc' in key and 'expert' in key:
                     key_list = key.split('.')
                     local_ep_index = int(key_list[6])
                     key_list[6] = str(ep_index * ep_length + local_ep_index)
@@ -383,6 +384,18 @@ def convert_checkpoint_from_transformers_to_megatron(args):
         setattr(margs, k, v)
 
     state_dict = AutoModelForCausalLM.from_pretrained(args.load_path).state_dict()
+    for key in state_dict.keys():
+        print(key)
+        split_key = key.split('.')
+        if len(split_key) > 2:
+            layer_id = split_key[2]
+        else:
+            layer_id = key 
+        if layer_id.isdigit():
+            cuda_id = int(layer_id) // 8
+        else:
+            cuda_id = 7
+        state_dict[key] = state_dict[key].to(f"cuda:{cuda_id}")
     internal_state_dict = {}
     for layer_id in range(config.num_hidden_layers):
 
@@ -476,6 +489,7 @@ def convert_checkpoint_from_transformers_to_megatron(args):
     hidden_size_per_head = config.hidden_size // config.num_attention_heads
 
     for pp_rank in range(args.target_pipeline_model_parallel_size):
+        print(f"processing pp_rank: {pp_rank}")
         layer_offset = pp_rank * num_layers
         if pp_rank > 0:
             output_state_dict = []
@@ -495,6 +509,7 @@ def convert_checkpoint_from_transformers_to_megatron(args):
             ]
 
             for layer_name in layers_to_copy:
+                print(layer_name)
                 m = layer_re.match(layer_name)
                 # Stop if that's not a layer
                 if m is None:
@@ -631,7 +646,11 @@ def convert_checkpoint_from_transformers_to_megatron(args):
 
         # saving the state dict as per the tp_rank and pp_rank
         for tp_rank in range(args.target_tensor_model_parallel_size):
-            current_keys = list(output_state_dict[tp_rank]['model'].keys())
+            cur_rank_state_dict = output_state_dict[tp_rank]
+            output_state_dict[tp_rank] = 'processed_flag'
+            for key in cur_rank_state_dict['model'].keys():
+                cur_rank_state_dict['model'][key].to('cpu')
+            current_keys = list(cur_rank_state_dict['model'].keys())
             ep_state_dict = []
             for i in range(args.target_expert_model_parallel_size):
                 ep_state_dict.append({})
@@ -642,9 +661,9 @@ def convert_checkpoint_from_transformers_to_megatron(args):
                     expert_group_id = expert_group_mapping[eid]
                     local_expert_id = expert_local_mapping[eid]
                     keywords[6] = str(local_expert_id)
-                    ep_state_dict[expert_group_id][".".join(keywords)] = output_state_dict[tp_rank]['model'][
+                    ep_state_dict[expert_group_id][".".join(keywords)] = cur_rank_state_dict['model'][
                         key].clone()
-                    output_state_dict[tp_rank]['model'].pop(key)
+                    cur_rank_state_dict['model'].pop(key)
 
             for ep_rank in range(args.target_expert_model_parallel_size):
                 checkpoint_dir = get_checkpoint_sub_dir_name(tp_rank, pp_rank, args.target_pipeline_model_parallel_size,
@@ -653,8 +672,8 @@ def convert_checkpoint_from_transformers_to_megatron(args):
                 os.makedirs(save_dir, exist_ok=True)
                 checkpoint_name = "model_optim_rng.pt"
                 checkpoint_path = os.path.join(save_dir, checkpoint_name)
-                output_state_dict[tp_rank]['model'].update(ep_state_dict[ep_rank])
-                torch.save(output_state_dict[tp_rank], checkpoint_path)
+                cur_rank_state_dict['model'].update(ep_state_dict[ep_rank])
+                torch.save(cur_rank_state_dict, checkpoint_path)
 
 
 def convert_checkpoint_from_megatron_to_transformers(args):
@@ -691,7 +710,15 @@ def convert_checkpoint_from_megatron_to_transformers(args):
     else:
         dtype = torch.float32
 
-    config = MixtralConfig()
+    if args.model_name == "8x7B":
+        config = MixtralConfig()
+    elif args.model_name == "8x22B":
+        config = MixtralConfig(
+                    hidden_size=6144, \
+                    intermediate_size=16384, \
+                    num_hidden_layers=56, \
+                    num_attention_heads=48
+                 )
 
     output_state_dict = {}
 
@@ -708,6 +735,7 @@ def convert_checkpoint_from_megatron_to_transformers(args):
 
     # Embeddings
     print("Converting embeddings")
+    print(f"tp={tp_size}, pp={pp_size}, ep={ep_size}")
     tp_state_dicts = get_megatron_sharded_states(args, tp_size, pp_size, ep_size, 0)
 
     # import pdb
