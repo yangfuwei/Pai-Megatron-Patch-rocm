@@ -2,12 +2,12 @@
 
 set -e
 START_TIME=$SECONDS
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 MASTER_ADDR=localhost
 MASTER_PORT=$(shuf -n 1 -i 10000-65535)
 NNODES=1
 NODE_RANK=0
-GPUS_PER_NODE=1
+GPUS_PER_NODE=8
 DISTRIBUTED_ARGS="--nproc_per_node $GPUS_PER_NODE --nnodes $NNODES --node_rank $NODE_RANK --master_addr $MASTER_ADDR --master_port $MASTER_PORT"
 
 MODEL_SIZE=$1
@@ -32,9 +32,14 @@ NUM_ATTN_HEADS=32
 INTERMEDIATE_SIZE=14336
 NUM_KEY_VALUE_HEADS=8
 
-gqa_options=" \
-		    --group-query-attention \
-		    --num-query-groups 8"
+model_config_options=" \
+                    --num-layers $NUM_LAYERS \
+                    --hidden-size $HIDDEN_SIZE \
+                    --intermediate-size $INTERMEDIATE_SIZE \
+                    --num-attn-heads $NUM_ATTN_HEADS \
+                    --num-key-value-heads $NUM_KEY_VALUE_HEADS \
+                    --group-query-attention \
+                    --num-query-groups 8"
 
 elif [ $MODEL_SIZE = 8x7B ]; then
 
@@ -44,9 +49,11 @@ NUM_ATTN_HEADS=32
 INTERMEDIATE_SIZE=14336
 NUM_KEY_VALUE_HEADS=8
 WS=${13}
-gqa_options=" \
-		    --group-query-attention \
-		    --num-query-groups 8"
+model_config_options=" \
+                    --group-query-attention \
+                    --num-query-groups 8"
+
+		   
 
 elif [ $MODEL_SIZE = 8x22B ]; then
 
@@ -56,7 +63,7 @@ NUM_ATTN_HEADS=48
 INTERMEDIATE_SIZE=16384
 NUM_KEY_VALUE_HEADS=8
 WS=${13}
-gqa_options=" \
+model_config_options=" \
                     --group-query-attention \
                     --num-query-groups 8"
 
@@ -137,6 +144,7 @@ python hf2mcore_mixtral.py \
 --target_pipeline_model_parallel_size ${PP} \
 --target_expert_model_parallel_size ${EP} \
 --world_size ${WS} \
+--model_name ${MODEL_SIZE}
 ${convert_options} \
 
 elif [ $MODEL_SIZE = 8x22B ]; then
@@ -150,6 +158,7 @@ python hf2mcore_mixtral.py \
 --target_pipeline_model_parallel_size ${PP} \
 --target_expert_model_parallel_size ${EP} \
 --world_size ${WS} \
+--model_name ${MODEL_SIZE} \
 ${convert_options} \
 
 fi
