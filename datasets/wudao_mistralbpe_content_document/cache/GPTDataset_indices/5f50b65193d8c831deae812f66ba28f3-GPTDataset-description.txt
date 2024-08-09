@@ -1,0 +1,17 @@
+{
+    "class": "GPTDataset",
+    "path_prefix": "/home/amd/fuweiy/cache/datasets/wudao_mistralbpe_content_document",
+    "num_samples": 48800,
+    "index_split": "train",
+    "random_seed": 1234,
+    "sequence_length": 2048,
+    "split": "100,0,0",
+    "split_matrix": [
+        [
+            0,
+            1.0
+        ],
+        null,
+        null
+    ]
+}
