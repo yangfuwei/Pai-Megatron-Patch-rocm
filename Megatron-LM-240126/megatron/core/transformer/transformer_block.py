@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Union
 
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 
 from megatron.core import InferenceParams, parallel_state, tensor_parallel
 from megatron.core.dist_checkpointing.mapping import ShardedStateDict
@@ -35,6 +35,25 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.transformer_layer import TransformerLayer
 from megatron.core.transformer.utils import sharded_state_dict_default
 from megatron.core.utils import make_sharded_tensor_for_checkpoint, make_viewless_tensor
+
+class MixtralRMSNorm(nn.Module):
+    def __init__(self, hidden_size, eps=1e-6):
+        """
+        MixtralRMSNorm is equivalent to T5LayerNorm
+        """
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.variance_epsilon = eps
+
+    def forward(self, hidden_states):
+        input_dtype = hidden_states.dtype
+        hidden_states = hidden_states.to(torch.float32)
+        variance = hidden_states.pow(2).mean(-1, keepdim=True)
+        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+        return self.weight * hidden_states.to(input_dtype)
+
+    def extra_repr(self):
+        return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
 
 
 def get_num_layers_to_build(config: TransformerConfig) -> int:
@@ -104,8 +123,8 @@ class TransformerBlock(MegatronModule):
         self,
         config: TransformerConfig,
         spec: Union[TransformerBlockSubmodules, ModuleSpec],
-        # post_layer_norm: bool = True,
-        post_layer_norm: bool = False,
+        post_layer_norm: bool = True,
+        #post_layer_norm: bool = False,
         pre_process: bool = True,
         post_process: bool = True,
     ):
@@ -180,11 +199,12 @@ class TransformerBlock(MegatronModule):
 
         if self.post_process and self.post_layer_norm:
             # Final layer norm before output.
-            self.final_layernorm = TENorm(
-                config=self.config,
-                hidden_size=self.config.hidden_size,
-                eps=self.config.layernorm_epsilon,
-            )
+            #self.final_layernorm = TENorm(
+            #    config=self.config,
+            #    hidden_size=self.config.hidden_size,
+            #    eps=self.config.layernorm_epsilon,
+            #)
+            self.final_layernorm = MixtralRMSNorm(self.config.hidden_size, eps=self.config.layernorm_epsilon)
 
     def _get_layer(self, layer_number: int):
         return self.layers[layer_number]
