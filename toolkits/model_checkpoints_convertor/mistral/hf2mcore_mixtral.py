@@ -525,12 +525,14 @@ def convert_checkpoint_from_transformers_to_megatron(args):
                 params = internal_state_dict[layer_name].to(dtype)
                 # handle layernorm
                 if op_name.startswith("input_layernorm") and weight_or_bias == "weight":
-                    out_name = "self_attention.linear_qkv"
-                    layer_name = f"layers.{layer}.{out_name}.layer_norm_weight"
+                    #out_name = "self_attention.linear_qkv"
+                    #layer_name = f"layers.{layer}.{out_name}.layer_norm_weight"
+                    layer_name = f"layers.{layer}.input_layernorm.weight"
 
                 elif op_name.startswith("post_attention_layernorm") and weight_or_bias == "weight":
-                    out_name = "mlp.linear_fc1.layer_norm_weight"
-                    layer_name = f"layers.{layer}.{out_name}"
+                    #out_name = "mlp.linear_fc1.layer_norm_weight"
+                    #layer_name = f"layers.{layer}.{out_name}"
+                    layer_name = f"layers.{layer}.pre_mlp_layernorm.weight"
 
                 # handle attention K, V, Q weights
                 elif op_name.startswith("self_attn.query") and weight_or_bias == "weight":
@@ -848,8 +850,10 @@ def convert_checkpoint_from_megatron_to_transformers(args):
                 ).to(dtype)
 
             # For layernorm(s), simply store the layer norm.
-            if op_name.endswith("layer_norm_weight") or op_name.endswith("layernorm"):
-                ln_name = "input_layernorm" if op_name.endswith("layer_norm_weight") else "post_attention_layernorm"
+            # if op_name.endswith("layer_norm_weight") or op_name.endswith("layernorm"):
+                #ln_name = "input_layernorm" if op_name.endswith("layer_norm_weight") else "post_attention_layernorm"
+            if "pre_mlp_layernorm" in op_name or "input_layernorm" in op_name:
+                ln_name = "post_attention_layernorm" if "pre_mlp_layernorm" in op_name else "input_layernorm"
                 output_state_dict[layer_name + "." + ln_name + "." + weight_or_bias] = params.clone()
                 continue
 
