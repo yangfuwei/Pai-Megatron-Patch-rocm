@@ -181,6 +181,7 @@ mkdir -p ${TENSORBOARD_DIR}
 SAVED_PRETRAIN_CHECKPOINT_PATH="${OUTPUT_BASEPATH}/checkpoint/${NAME}"
 
 megatron_options="  \
+        --no-save-optim \
         --no-torch-compile \
         --log-throughput \
         --no-async-tensor-model-parallel-allreduce \
@@ -240,8 +241,8 @@ megatron_options="  \
         --no-position-embedding \
         --use-mcore-models \
         --no-rope-fusion \
-        --distributed-timeout-minutes 6000
-        --transformer-impl transformer_engine"
+        --distributed-timeout-minutes 6000"
+#        --transformer-impl transformer_engine"
 
 run_cmd="torchrun $DISTRIBUTED_ARGS pretrain_mcore_mistral.py
  ${megatron_options} ${pr_options} ${load_options} ${te_options} ${activation_checkpoint_options} ${do_options} ${flash_options} ${sp_options} ${gqa_options} ${moe_options}"

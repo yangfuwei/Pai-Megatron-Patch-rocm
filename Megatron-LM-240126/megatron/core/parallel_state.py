@@ -271,8 +271,8 @@ def initialize_model_parallel(
             group = torch.distributed.new_group(
                 ranks, pg_options=get_nccl_options('dp', nccl_comm_cfgs)
             )
-            #group_gloo = torch.distributed.new_group(ranks, backend="gloo")
-            group_gloo = torch.distributed.new_group(ranks, backend="nccl")
+            group_gloo = torch.distributed.new_group(ranks, backend="gloo")
+            #group_gloo = torch.distributed.new_group(ranks, backend="nccl")
             if rank in ranks:
                 _DATA_PARALLEL_GROUP = group
                 _DATA_PARALLEL_GROUP_GLOO = group_gloo
@@ -283,8 +283,8 @@ def initialize_model_parallel(
             group_with_cp = torch.distributed.new_group(
                 ranks_with_cp, pg_options=get_nccl_options('dp_cp', nccl_comm_cfgs)
             )
-            #group_with_cp_gloo = torch.distributed.new_group(ranks_with_cp, backend="gloo")
-            group_with_cp_gloo = torch.distributed.new_group(ranks_with_cp, backend="nccl")
+            group_with_cp_gloo = torch.distributed.new_group(ranks_with_cp, backend="gloo")
+            #group_with_cp_gloo = torch.distributed.new_group(ranks_with_cp, backend="nccl")
             if rank in ranks_with_cp:
                 _DATA_PARALLEL_GROUP_WITH_CP = group_with_cp
                 _DATA_PARALLEL_GROUP_WITH_CP_GLOO = group_with_cp_gloo
