@@ -2,6 +2,9 @@
 #sh run_pretrain_megatron_mixtral.sh dsw ../.. 0.125B 1 8 1e-5 1e-6 80 80 0 bf16 2 1 sel true true true true 100  /mnt/llama2-datasets/alpaca_data.json /mnt/mixtral-ckpts/Mixtral-8x7B-v0.1 10000000000 100000000 /mnt/test_mixtral_output
 
 set -e
+
+export RCCL_MSCCL_ENABLE=0
+
 ENV=$1
 MEGATRON_PATCH_PATH=$2
 MEGATRON_PATH=${MEGATRON_PATCH_PATH}/Megatron-LM-240126
@@ -22,6 +25,8 @@ NNODES=2
 NODE_RANK=${27}
 GPUS_PER_NODE=8
 TOTAL_GPUS=$(($GPUS_PER_NODE*$NNODES))
+MASTER_ADDR=${28}
+MASTER_PORT=29500
 
 fi
 
@@ -51,7 +56,7 @@ PRETRAIN_CHECKPOINT_PATH=${23}
 TRAIN_ITERS=${24}
 LR_WARMUP_ITERS=${25}
 OUTPUT_BASEPATH=${26}
-EP=${28}
+EP=${29}
 
 if [ $MODEL_SIZE = 7B ]; then
 
@@ -178,6 +183,11 @@ mkdir -p ${TENSORBOARD_DIR}
 SAVED_PRETRAIN_CHECKPOINT_PATH="${OUTPUT_BASEPATH}/checkpoint/${NAME}"
 
 megatron_options="  \
+        --no-save-optim \
+        --no-torch-compile \
+        --log-throughput \
+        --no-async-tensor-model-parallel-allreduce \
+        --no-gradient-accumulation-fusion \
         --save ${SAVED_PRETRAIN_CHECKPOINT_PATH} \
         --train-data-path ${DATASET_PATH} \
         --data-path ${DATASET_PATH} \

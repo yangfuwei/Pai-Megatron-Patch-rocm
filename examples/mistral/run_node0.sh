@@ -7,11 +7,11 @@ GBS=32
 sh run_finetune_mcore_mistral_withGA.sh  \
 dlc  \
 ../../ \
-22B   \  # model size, 7B or 22B
-$MBS    \    
+22B   \
+$MBS    \
 $GBS \
-1e-5   \   #lr
-1e-6   \   #min lr
+1e-5   \
+1e-6   \
 2048  \
 2048  \
 0   \
@@ -32,7 +32,7 @@ true \
 20000   \
 ./checkpoints/mixtral-8x22b-tp8pp2ep1-2nodes-fromscratch \
 0 \
-10.11.8.152 \
+172.16.11.53 \
 ${EP} \
 2 >& 1 | tee MI300-Mixtral8x22B-tp${TP}pp${PP}ep${EP}-mbs${MBS}-gbs${GPS}.log
 
