@@ -18,9 +18,9 @@ TOTAL_GPUS=$(($GPUS_PER_NODE*$NNODES))
 
 elif [ $ENV = dlc ]; then
 
-NNODES=${WORLD_SIZE}
-NODE_RANK=${RANK}
-GPUS_PER_NODE=${KUBERNETES_CONTAINER_RESOURCE_GPU}
+NNODES=2
+NODE_RANK=${27}
+GPUS_PER_NODE=8
 TOTAL_GPUS=$(($GPUS_PER_NODE*$NNODES))
 
 fi
@@ -51,6 +51,7 @@ PRETRAIN_CHECKPOINT_PATH=${23}
 TRAIN_ITERS=${24}
 LR_WARMUP_ITERS=${25}
 OUTPUT_BASEPATH=${26}
+EP=${28}
 
 if [ $MODEL_SIZE = 7B ]; then
 
@@ -65,7 +66,18 @@ gqa_options=" \
 		    --group-query-attention \
 		    --num-query-groups 8"
 
+elif [ $MODEL_SIZE = 22B ]; then
+	NUM_LAYERS=56
+	HIDDEN_SIZE=6144
+	NUM_ATTN_HEADS=48
+	INTERMEDIATE_SIZE=16384
+	MAX_POSITION_EMBEDDINGS=65536
+	SLW=4096
+	gqa_options=" \
+              --group-query-attention \
+              --num-query-groups 8"
 fi
+
 
 if [ $AC = full ]; then
     activation_checkpoint_options=" \
@@ -129,7 +141,7 @@ if [ $MOE = true ]; then
 		    --moe-router-topk 2 \
 		    --num-experts 8 \
 		    --moe-aux-loss-coeff 1e-2 \
-		    --expert-model-parallel-size 1 \
+		    --expert-model-parallel-size ${EP} \
 		    --moe-router-load-balancing-type aux_loss"
 
 elif [ $MOE = false ]; then
@@ -151,7 +163,7 @@ if [ $PRETRAIN_CHECKPOINT_PATH != none ]; then
             --load $PRETRAIN_CHECKPOINT_PATH"
 fi
 
-EP=$(($TOTAL_GPUS/$TP/$PP))
+#EP=$(($TOTAL_GPUS/$TP/$PP))
 
 LR_DECAY_ITERS=$(( ${TRAIN_ITERS} - ${LR_WARMUP_ITERS}))
 
