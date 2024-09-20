@@ -56,7 +56,7 @@ PRETRAIN_CHECKPOINT_PATH=${22}
 TRAIN_TOKENS=${23}
 WARMUP_TOKENS=${24}
 OUTPUT_BASEPATH=${25}
-EP=${28}
+GG=${28}
 
 if [ $MODEL_SIZE = 7B ]; then
 NUM_LAYERS=32
@@ -181,6 +181,12 @@ mkdir -p ${TENSORBOARD_DIR}
 
 SAVED_PRETRAIN_CHECKPOINT_PATH="${OUTPUT_BASEPATH}/checkpoint/${NAME}"
 
+
+if [ $GG = true ]; then
+    gg_options='--moe-grouped-gemm'
+fi
+
+
 megatron_options="  \
         --no-save-optim \
         --no-torch-compile \
@@ -246,7 +252,7 @@ megatron_options="  \
 #        --transformer-impl transformer_engine"
 
 run_cmd="torchrun $DISTRIBUTED_ARGS pretrain_mcore_mistral.py
- ${megatron_options} ${pr_options} ${load_options} ${te_options} ${activation_checkpoint_options} ${do_options} ${flash_options} ${sp_options} ${gqa_options} ${moe_options}"
+ ${megatron_options} ${pr_options} ${load_options} ${te_options} ${activation_checkpoint_options} ${do_options} ${flash_options} ${sp_options} ${gqa_options} ${moe_options} ${gg_options}"
 
 echo ${run_cmd}
 eval ${run_cmd}
