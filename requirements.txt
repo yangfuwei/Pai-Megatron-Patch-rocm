@@ -17,3 +17,5 @@ sacrebleu
 tensorboard
 lm_dataformat
 tiktoken
+pybind11
+regex
